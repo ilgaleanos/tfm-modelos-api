@@ -154,3 +154,4 @@ cython_debug/
 # modelos
 *.sav
 *.h5
+api_modelos/settings.py
