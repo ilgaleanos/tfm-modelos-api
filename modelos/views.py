@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from pathlib import Path
 
+import os
 import json
 
 import pickle
@@ -23,11 +24,17 @@ modelos = {
     "e_1k_9k": pickle.load(open(str(BASE_DIR) + '/modelos/models/e_1k_9k.sav', 'rb')),
     "e_9k+": pickle.load(open(str(BASE_DIR) + '/modelos/models/e_9k+.sav', 'rb')),
 
-    "m_0_1k": tf.keras.models.load_model(str(BASE_DIR) + '/modelos/models/m_0_1k.h5'),
-    "m_1k_9k": tf.keras.models.load_model(str(BASE_DIR) + '/modelos/models/m_1k_9k.h5'),
+    "red_0_1k": tf.keras.models.load_model(str(BASE_DIR) + '/modelos/models/red_0_1k.h5'),
+    "red_1k_9k": tf.keras.models.load_model(str(BASE_DIR) + '/modelos/models/red_1k_9k.h5'),
+    "red_9k+": tf.keras.models.load_model(str(BASE_DIR) + '/modelos/models/red_9k+.h5'),
 
+    "lr_0_1k": pickle.load(open(str(BASE_DIR) + '/modelos/models/lr_0_1k.sav', 'rb')),
     "lr_1k_9k": pickle.load(open(str(BASE_DIR) + '/modelos/models/lr_1k_9k.sav', 'rb')),
     "lr_9k+": pickle.load(open(str(BASE_DIR) + '/modelos/models/lr_9k+.sav', 'rb')),
+
+    "rfr_0_1k": pickle.load(open(str(BASE_DIR) + '/modelos/models/rfr_0_1k.sav', 'rb')),
+    "rfr_1k_9k": pickle.load(open(str(BASE_DIR) + '/modelos/models/rfr_1k_9k.sav', 'rb')),
+    "rfr_9k+": pickle.load(open(str(BASE_DIR) + '/modelos/models/rfr_9k+.sav', 'rb')),
 }
 
 
@@ -77,18 +84,57 @@ def procesar_entrada(json_data):
 # ==============================================================================
 
 def obtenerRegresionLineal(json_data):
-    if json_data['pib'] < 9000:
-        return modelos['lr_1k_9k']
-    else:
-        print('lr_9k+')
+    pib = json_data['pib']
+    if pib < 1000:
+        return modelos['lr_0_1k']
+    elif pib > 9000:
         return modelos['lr_9k+']
+    else:
+        return modelos['lr_1k_9k']
+
+
+def obteneDecisitionRegressor(json_data):
+    pib = json_data['pib']
+    if pib < 1000:
+        return modelos['dr_0_1k']
+    elif pib > 9000:
+        return modelos['dr_9k+']
+    else:
+        return modelos['dr_1k_9k']
+
+
+def obtenerRandomForestRegressor(json_data):
+    pib = json_data['pib']
+    if pib < 1000:
+        return modelos['rfr_0_1k']
+    elif pib > 9000:
+        return modelos['rfr_9k+']
+    else:
+        return modelos['rfr_1k_9k']
+
+
+def obtenerRegresor(json_data):
+    pib = json_data['pib']
+    if pib < 1000:
+        return modelos['lr_0_1k']
+    elif pib > 9000:
+        return modelos['rfr_9k+']
+    else:
+        return modelos['lr_1k_9k']
+
+# ==============================================================================
+# Obtener modelo de red
+# ==============================================================================
 
 
 def obtenerRed(json_data):
-    if json_data['pib'] < 1000:
-        return modelos['m_0_1k']
+    pib = json_data['pib']
+    if pib < 1000:
+        return modelos['red_0_1k']
+    elif pib > 9000:
+        return modelos['red_9k+']
     else:
-        return modelos['m_1k_9k']
+        return modelos['red_1k_9k']
 
 # ==============================================================================
 # Predictor de delitos en uriel red
@@ -98,6 +144,12 @@ def obtenerRed(json_data):
 def red(request):
     if request.method == 'POST':
         json_data = json.loads(request.body)
+
+        if 'key' not in json_data or json_data['key'] != os.getenv("API_KEY"):
+            response = HttpResponse()
+            response.status_code = 403
+            return response
+
         x = procesar_entrada(json_data)
         prediccion = obtenerRed(json_data).predict(x)[0][0]
 
@@ -115,8 +167,14 @@ def red(request):
 def regresion(request):
     if request.method == 'POST':
         json_data = json.loads(request.body)
+
+        if 'key' not in json_data or json_data['key'] != os.getenv("API_KEY"):
+            response = HttpResponse()
+            response.status_code = 403
+            return response
+
         x = procesar_entrada(json_data)
-        prediccion = obtenerRegresionLineal(json_data).predict(x[0])
+        prediccion = obtenerRegresor(json_data).predict(x[0])
 
         return HttpResponse(escalar_uriel_inv(json_data, prediccion))
 
